@@ -467,7 +467,8 @@ class EntryCreateTask(flow_utils.CinderTask):
         requires = ['availability_zone', 'description', 'metadata',
                     'name', 'reservations', 'size', 'snapshot_id',
                     'source_volid', 'volume_type_id', 'encryption_key_id',
-                    'source_replicaid', 'consistencygroup_id', ]
+                    'source_replicaid', 'consistencygroup_id',
+                    'multiattach']
         super(EntryCreateTask, self).__init__(addons=[ACTION],
                                               requires=requires)
         self.db = db
@@ -494,6 +495,7 @@ class EntryCreateTask(flow_utils.CinderTask):
             'display_description': kwargs.pop('description'),
             'display_name': kwargs.pop('name'),
             'replication_status': 'disabled',
+            'multiattach': kwargs.pop('multiattach'),
         }
 
         # Merge in the other required arguments which should provide the rest

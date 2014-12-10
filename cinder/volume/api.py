@@ -154,7 +154,8 @@ class API(base.Base):
                image_id=None, volume_type=None, metadata=None,
                availability_zone=None, source_volume=None,
                scheduler_hints=None, backup_source_volume=None,
-               source_replica=None, consistencygroup=None):
+               source_replica=None, consistencygroup=None,
+               cgsnapshot=None, multiattach=False):
 
         # NOTE(jdg): we can have a create without size if we're
         # doing a create from snap or volume.  Currently
@@ -227,7 +228,9 @@ class API(base.Base):
             'backup_source_volume': backup_source_volume,
             'source_replica': source_replica,
             'optional_args': {'is_quota_committed': False},
-            'consistencygroup': consistencygroup
+            'consistencygroup': consistencygroup,
+            'cgsnapshot': cgsnapshot,
+            'multiattach': multiattach,
         }
         try:
             flow_engine = create_volume.get_flow(self.scheduler_rpcapi,
@@ -443,6 +446,13 @@ class API(base.Base):
         volume = self.db.volume_get(context, volume['id'])
         if volume['status'] == 'available':
             self.update(context, volume, {"status": "attaching"})
+        elif volume['status'] == 'in-use':
+            if volume['multiattach']:
+                self.update(context, volume, {"status": "attaching"})
+            else:
+                msg = _("Volume must be multiattachable to reserve again.")
+                LOG.error(msg)
+                raise exception.InvalidVolume(reason=msg)
         else:
             msg = _("Volume status must be available to reserve")
             LOG.error(msg)
@@ -450,8 +460,14 @@ class API(base.Base):
 
     @wrap_check_policy
     def unreserve_volume(self, context, volume):
-        if volume['status'] == "attaching":
-            self.update(context, volume, {"status": "available"})
+        volume = self.db.volume_get(context, volume['id'])
+        if volume['status'] == 'attaching':
+            attaches = self.db.volume_attachment_get_used_by_volume_id(
+                context, volume['id'])
+            if attaches:
+                self.update(context, volume, {"status": "in-use"})
+            else:
+                self.update(context, volume, {"status": "available"})
 
     @wrap_check_policy
     def begin_detaching(self, context, volume):
@@ -501,8 +517,9 @@ class API(base.Base):
                                                 mode)
 
     @wrap_check_policy
-    def detach(self, context, volume):
-        return self.volume_rpcapi.detach_volume(context, volume)
+    def detach(self, context, volume, attachment_id):
+        return self.volume_rpcapi.detach_volume(context, volume,
+                                                attachment_id)
 
     @wrap_check_policy
     def initialize_connection(self, context, volume, connector):

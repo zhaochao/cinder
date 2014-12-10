@@ -151,10 +151,26 @@ class HP3PARCommon(object):
         2.0.21 - Remove bogus invalid snapCPG=None exception
         2.0.22 - HP 3PAR drivers should not claim to have 'infinite' space
         2.0.23 - Increase the hostname size from 23 to 31  Bug #1371242
+        2.0.24 - Add pools (hp3par_cpg now accepts a list of CPGs)
+        2.0.25 - Migrate without losing type settings bug #1356608
+        2.0.26 - Don't ignore extra-specs snap_cpg when missing cpg #1368972
+        2.0.27 - Fixing manage source-id error bug #1357075
+        2.0.28 - Removing locks bug #1381190
+        2.0.29 - Report a limitless cpg's stats better bug #1398651
+        2.0.30 - Update the minimum hp3parclient version bug #1402115
+        2.0.31 - Removed usage of host name cache #1398914
+        2.0.32 - Update LOG usage to fix translations.  bug #1384312
+        2.0.33 - Fix host persona to match WSAPI mapping bug #1403997
+        2.0.34 - Fix log messages to match guidelines. bug #1411370
+        2.0.35 - Fix default snapCPG for manage_existing bug #1393609
+        2.0.36 - Added support for dedup provisioning
+        2.0.37 - Added support for enabling Flash Cache
+        2.0.38 - Add stats for hp3par goodness_function and filter_function
+        2.0.39 - Added support for updated detach_volume attachment.
 
     """
 
-    VERSION = "2.0.23"
+    VERSION = "2.0.39"
 
     stats = {}
 
@@ -1334,7 +1350,12 @@ class HP3PARCommon(object):
             raise exception.VolumeBackendAPIException(data=msg)
 
     def attach_volume(self, volume, instance_uuid):
-        LOG.debug("Attach Volume\n%s" % pprint.pformat(volume))
+        """Save the instance UUID in the volume.
+
+           TODO: add support for multi-attach
+
+        """
+        LOG.debug("Attach Volume\n%s", pprint.pformat(volume))
         try:
             self.update_volume_key_value_pair(volume,
                                               'HPQ-CS-instance_uuid',
@@ -1343,8 +1364,13 @@ class HP3PARCommon(object):
             with excutils.save_and_reraise_exception():
                 LOG.error(_("Error attaching volume %s") % volume)
 
-    def detach_volume(self, volume):
-        LOG.debug("Detach Volume\n%s" % pprint.pformat(volume))
+    def detach_volume(self, volume, attachment=None):
+        """Remove the instance uuid from the volume.
+
+           TODO: add support for multi-attach.
+
+        """
+        LOG.debug("Detach Volume\n%s", pprint.pformat(volume))
         try:
             self.clear_volume_key_value_pair(volume, 'HPQ-CS-instance_uuid')
         except Exception:
