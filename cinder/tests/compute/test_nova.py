@@ -45,27 +45,37 @@ class NovaClientTestCase(test.TestCase):
     def test_nova_client_regular(self, p_client):
         nova.novaclient(self.ctx)
         p_client.assert_called_once_with(
-            'regularuser', 'token', None,
+            'regularuser', 'token', None, region_name=None,
             auth_url='http://novahost:8774/v2/e3f0833dc08b4cea',
-            insecure=False, cacert=None,
+            insecure=False, endpoint_type='publicURL', cacert=None,
             extensions=[assisted_volume_snapshots])
 
     @mock.patch('novaclient.v1_1.client.Client')
     def test_nova_client_admin_endpoint(self, p_client):
         nova.novaclient(self.ctx, admin_endpoint=True)
         p_client.assert_called_once_with(
-            'regularuser', 'token', None,
+            'regularuser', 'token', None, region_name=None,
             auth_url='http://novaadmhost:4778/v2/e3f0833dc08b4cea',
-            insecure=False, cacert=None,
+            insecure=False, endpoint_type='adminURL', cacert=None,
             extensions=[assisted_volume_snapshots])
 
     @mock.patch('novaclient.v1_1.client.Client')
     def test_nova_client_privileged_user(self, p_client):
         nova.novaclient(self.ctx, privileged_user=True)
         p_client.assert_called_once_with(
-            'adminuser', 'strongpassword', None,
+            'adminuser', 'strongpassword', None, region_name=None,
             auth_url='http://keystonehost:5000/v2.0',
-            insecure=False, cacert=None,
+            insecure=False, endpoint_type='publicURL', cacert=None,
+            extensions=[assisted_volume_snapshots])
+
+    @mock.patch('novaclient.v1_1.client.Client')
+    def test_nova_client_custom_region(self, p_client):
+        self.override_config('os_region_name', 'farfaraway')
+        nova.novaclient(self.ctx)
+        p_client.assert_called_once_with(
+            'regularuser', 'token', None, region_name='farfaraway',
+            auth_url='http://novahost:8774/v2/e3f0833dc08b4cea',
+            insecure=False, endpoint_type='publicURL', cacert=None,
             extensions=[assisted_volume_snapshots])
 
 
