@@ -144,7 +144,7 @@ class DellEQLSanISCSIDriver(SanISCSIDriver):
                 # has closed the connection.
                 msg = _("The EQL array has closed the connection.")
                 LOG.error(msg)
-                raise processutils.ProcessExecutionError(description=msg)
+                raise exception.VolumeBackendAPIException(data=msg)
             out += ret
 
         LOG.debug("CLI output\n%s", out)
@@ -226,7 +226,8 @@ class DellEQLSanISCSIDriver(SanISCSIDriver):
                         greenthread.sleep(random.randint(20, 500) / 100.0)
                 msg = (_("SSH Command failed after '%(total_attempts)r' "
                          "attempts : '%(command)s'") %
-                       {'total_attempts': total_attempts, 'command': command})
+                       {'total_attempts': total_attempts - attempts,
+                        'command': command})
                 raise exception.VolumeBackendAPIException(data=msg)
 
         except Exception:
