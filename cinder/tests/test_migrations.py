@@ -1384,3 +1384,24 @@ class TestMigrations(test.TestCase):
         self.assertIsInstance(volumes.c.mountpoint.type,
                               sqlalchemy.types.VARCHAR)
 
+    def _check_029(self, engine, data):
+        backups = db_utils.get_table(engine, 'backups')
+        self.assertIsInstance(backups.c.temp_volume_id.type,
+                              sqlalchemy.types.VARCHAR)
+        self.assertIsInstance(backups.c.temp_snapshot_id.type,
+                              sqlalchemy.types.VARCHAR)
+
+    def _post_downgrade_029(self, engine):
+        backups = db_utils.get_table(engine, 'backups')
+        self.assertNotIn('temp_volume_id', backups.c)
+        self.assertNotIn('temp_snapshot_id', backups.c)
+
+    def _check_030(self, engine, data):
+        volumes = db_utils.get_table(engine, 'volumes')
+        self.assertIsInstance(volumes.c.previous_status.type,
+                              sqlalchemy.types.VARCHAR)
+
+    def _post_downgrade_030(self, engine):
+        volumes = db_utils.get_table(engine, 'volumes')
+        self.assertNotIn('previous_status', volumes.c)
+

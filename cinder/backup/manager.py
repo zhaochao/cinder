@@ -73,7 +73,7 @@ QUOTAS = quota.QUOTAS
 class BackupManager(manager.SchedulerDependentManager):
     """Manages backup of block storage devices."""
 
-    RPC_API_VERSION = '1.0'
+    RPC_API_VERSION = '1.2'
 
     target = messaging.Target(version=RPC_API_VERSION)
 
@@ -200,16 +200,27 @@ class BackupManager(manager.SchedulerDependentManager):
             backend = self._get_volume_backend(host=volume_host)
             attachments = volume['volume_attachment']
             if attachments:
-                if volume['status'] == 'backing-up':
-                    LOG.info(_LI('Resetting volume %s to available '
-                                 '(was backing-up).'), volume['id'])
+                if (volume['status'] == 'backing-up' and
+                        volume['previous_status'] == 'available'):
+                    LOG.info(_LI('Resetting volume %(vol_id)s to previous '
+                                 'status %(status)s (was backing-up).'),
+                             {'vol_id': volume['id'],
+                              'status': volume['previous_status']})
                     mgr = self._get_manager(backend)
                     for attachment in attachments:
                         if (attachment['attached_host'] == self.host and
                            attachment['instance_uuid'] is None):
                             mgr.detach_volume(ctxt, volume['id'],
                                               attachment['id'])
-                if volume['status'] == 'restoring-backup':
+                elif (volume['status'] == 'backing-up' and
+                        volume['previous_status'] == 'in-use'):
+                    LOG.info(_LI('Resetting volume %(vol_id)s to previous '
+                                 'status %(status)s (was backing-up).'),
+                             {'vol_id': volume['id'],
+                              'status': volume['previous_status']})
+                    self.db.volume_update(ctxt, volume['id'],
+                                          volume['previous_status'])
+                elif volume['status'] == 'restoring-backup':
                     LOG.info(_LI('setting volume %s to error_restoring '
                                  '(was restoring-backup).'), volume['id'])
                     mgr = self._get_manager(backend)
@@ -229,25 +240,60 @@ class BackupManager(manager.SchedulerDependentManager):
                 LOG.info(_('Resetting backup %s to error (was creating).')
                          % backup['id'])
                 err = 'incomplete backup reset on manager restart'
+                backup['status'] = 'error'
+                backup['fail_reason'] = err
                 self.db.backup_update(ctxt, backup['id'], {'status': 'error',
                                                            'fail_reason': err})
             if backup['status'] == 'restoring':
                 LOG.info(_('Resetting backup %s to available (was restoring).')
                          % backup['id'])
+                backup['status'] = 'available'
                 self.db.backup_update(ctxt, backup['id'],
                                       {'status': 'available'})
             if backup['status'] == 'deleting':
                 LOG.info(_('Resuming delete on backup: %s.') % backup['id'])
                 self.delete_backup(ctxt, backup['id'])
 
+        self._cleanup_temp_volumes_snapshots(backups)
+
+    def _cleanup_temp_volumes_snapshots(self, backups):
+        # NOTE(xyang): If the service crashes or gets restarted during the
+        # backup operation, there could be temporary volumes or snapshots
+        # that are not deleted. Make sure any temporary volumes or snapshots
+        # create by the backup job are deleted when service is started.
+        ctxt = context.get_admin_context()
+        for backup in backups:
+            volume = self.db.volume_get(ctxt, backup['volume_id'])
+            volume_host = volume_utils.extract_host(volume['host'], 'backend')
+            backend = self._get_volume_backend(host=volume_host)
+            mgr = self._get_manager(backend)
+            if backup['temp_volume_id'] and backup['status'] == 'error':
+                temp_volume = self.db.volume_get(ctxt,
+                                                 backup['temp_volume_id'])
+                # The temp volume should be deleted directly thru the
+                # the volume driver, not thru the volume manager.
+                mgr.driver.delete_volume(temp_volume)
+                self.db.volume_destroy(ctxt, temp_volume['id'])
+            if backup['temp_snapshot_id'] and backup['status'] == 'error':
+                temp_snapshot = self.db.snapshot_get(
+                        ctxt, backup['temp_snapshot_id'])
+                # The temp snapshot should be deleted directly thru the
+                # volume driver, not thru the volume manager.
+                mgr.driver.delete_snapshot(temp_snapshot)
+                self.db.volume_glance_metadata_delete_by_snapshot(
+                        ctxt, temp_snapshot['id'])
+                self.db.snapshot_destroy(ctxt, temp_snapshot['id'])
+
     def create_backup(self, context, backup_id):
         """Create volume backups using configured backup service."""
         backup = self.db.backup_get(context, backup_id)
         volume_id = backup['volume_id']
         volume = self.db.volume_get(context, volume_id)
-        LOG.info(_('Create backup started, backup: %(backup_id)s '
-                   'volume: %(volume_id)s.') %
-                 {'backup_id': backup_id, 'volume_id': volume_id})
+        previous_status = volume.get('previous_status', None)
+        LOG.info(_LI('Create backup started, backup: %(backup_id)s '
+                     'volume: %(volume_id)s.'),
+                 {'backup_id': backup['id'], 'volume_id': volume_id})
+
         volume_host = volume_utils.extract_host(volume['host'], 'backend')
         backend = self._get_volume_backend(host=volume_host)
 
@@ -293,12 +339,16 @@ class BackupManager(manager.SchedulerDependentManager):
         except Exception as err:
             with excutils.save_and_reraise_exception():
                 self.db.volume_update(context, volume_id,
-                                      {'status': 'available'})
+                                      {'status': previous_status,
+                                       'previous_status': 'error_backing-up'})
                 self.db.backup_update(context, backup_id,
                                       {'status': 'error',
                                        'fail_reason': unicode(err)})
 
-        self.db.volume_update(context, volume_id, {'status': 'available'})
+        # Restore the original status.
+        self.db.volume_update(context, volume_id,
+                              {'status': previous_status,
+                               'previous_status': 'backing-up'})
         self.db.backup_update(context, backup_id, {'status': 'available',
                                                    'size': volume['size'],
                                                    'availability_zone':
