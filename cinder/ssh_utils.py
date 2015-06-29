@@ -165,8 +165,8 @@ class SSHPool(pools.Pool):
             if conn.get_transport().is_active():
                 return conn
             else:
-                conn.close()
-        return self.create()
+                self.remove(conn)
+        return super(SSHPool, self).get()
 
     def remove(self, ssh):
         """Close an ssh client and remove it from free_items."""
