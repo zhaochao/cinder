@@ -416,6 +416,11 @@ def volume_types_get_by_name_or_id(context, volume_type_list):
     return IMPL.volume_types_get_by_name_or_id(context, volume_type_list)
 
 
+def volume_type_get_by_project_id(context, project_id):
+    """Get all volume type access of a volume type."""
+    return IMPL.volume_type_get_by_project_id(context, project_id)
+
+
 def volume_type_qos_associations_get(context, qos_specs_id, inactive=False):
     """Get volume types that are associated with specific qos specs."""
     return IMPL.volume_type_qos_associations_get(context,

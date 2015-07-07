@@ -174,6 +174,11 @@ def remove_volume_type_access(context, volume_type_id, project_id):
     return db.volume_type_access_remove(context, volume_type_id, project_id)
 
 
+def get_volume_type_by_project_id(context, project_id):
+    """Get volume types by project_id."""
+    return db.volume_type_get_by_project_id(context, project_id)
+
+
 def is_encrypted(context, volume_type_id):
     if volume_type_id is None:
         return False

@@ -2044,6 +2044,18 @@ def volume_types_get_by_name_or_id(context, volume_type_list):
     return req_volume_types
 
 
+@require_context
+def volume_type_get_by_project_id(context, project_id):
+    volume_types = volume_type_get_all(context)
+    rows = _volume_type_access_query(context)\
+        .filter_by(project_id=project_id)\
+        .all()
+    volume_type_ids = [volume_type['volume_type_id'] for volume_type in rows]
+    results = {key: value for key, value in volume_types.iteritems()
+               if value['id'] in volume_type_ids}
+    return results
+
+
 @require_admin_context
 def volume_type_qos_associations_get(context, qos_specs_id, inactive=False):
     read_deleted = "yes" if inactive else "no"

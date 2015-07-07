@@ -304,6 +304,15 @@ class VolumeController(wsgi.Controller):
                 msg = _("Volume type not found.")
                 raise exc.HTTPNotFound(explanation=msg)
 
+        else:
+            # If project has its own private volume types, pick one and pass
+            # to cinder-scheduler
+            if not volume_types.get_default_volume_type():
+                types = volume_types.get_volume_type_by_project_id(
+                    context, context.project_id)
+                if types:
+                    kwargs['volume_type'] = types.itervalues().next()
+
         kwargs['metadata'] = volume.get('metadata', None)
 
         snapshot_id = volume.get('snapshot_id')
