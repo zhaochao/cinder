@@ -21,8 +21,28 @@ from cinder.api.openstack import wsgi
 from cinder.api import xmlutil
 from cinder import exception
 from cinder.i18n import _
-from cinder.openstack.common import uuidutils
 from cinder.volume import volume_types
+import uuid
+
+
+def _format_uuid_string(string):
+    return (string.replace('urn:', '')
+                  .replace('uuid:', '')
+                  .strip('{}')
+                  .replace('-', '')
+                  .lower())
+
+
+def is_uuid_like(val):
+    """Returns validation of a value as a UUID.
+    :param val: Value to verify
+    :type val: string
+    :returns: bool
+    """
+    try:
+        return str(uuid.UUID(val)).replace('-', '') == _format_uuid_string(val)
+    except (TypeError, ValueError, AttributeError):
+        return False
 
 
 soft_authorize = extensions.soft_extension_authorizer('volume',
@@ -111,7 +131,7 @@ class VolumeTypeActionController(wsgi.Controller):
             raise webob.exc.HTTPBadRequest()
         access = body[action_name]
         project = access.get('project')
-        if not uuidutils.is_uuid_like(project):
+        if not is_uuid_like(project):
             msg = _("Bad project format: "
                     "project is not in proper format (%s)") % project
             raise webob.exc.HTTPBadRequest(explanation=msg)
