@@ -2876,7 +2876,7 @@ class VolumeTestCase(BaseVolumeTestCase):
 
     def _retype_volume_exec(self, driver, snap=False, policy='on-demand',
                             migrate_exc=False, exc=None, diff_equal=False,
-                            replica=False):
+                            replica=False, reserve_vol_type_only=False):
         elevated = context.get_admin_context()
         project_id = self.context.project_id
 
@@ -2905,6 +2905,17 @@ class VolumeTestCase(BaseVolumeTestCase):
         QUOTAS.add_volume_type_opts(self.context,
                                     reserve_opts,
                                     vol_type['id'])
+        if reserve_vol_type_only:
+            reserve_opts.pop('volumes')
+            reserve_opts.pop('gigabytes')
+            try:
+                usage = db.quota_usage_get(elevated, project_id, 'volumes')
+                total_volumes_in_use = usage.in_use
+                usage = db.quota_usage_get(elevated, project_id, 'gigabytes')
+                total_gigabytes_in_use = usage.in_use
+            except exception.QuotaUsageNotFound:
+                total_volumes_in_use = 0
+                total_gigabytes_in_use = 0
         reservations = QUOTAS.reserve(self.context,
                                       project_id=project_id,
                                       **reserve_opts)
@@ -2949,6 +2960,20 @@ class VolumeTestCase(BaseVolumeTestCase):
         except exception.QuotaUsageNotFound:
             volumes_in_use = 0
 
+        # Get new in_use after retype, it should not be changed.
+        if reserve_vol_type_only:
+            try:
+                usage = db.quota_usage_get(elevated, project_id, 'volumes')
+                new_total_volumes_in_use = usage.in_use
+                usage = db.quota_usage_get(elevated, project_id, 'gigabytes')
+                new_total_gigabytes_in_use = usage.in_use
+            except exception.QuotaUsageNotFound:
+                new_total_volumes_in_use = 0
+                new_total_gigabytes_in_use = 0
+            self.assertEqual(total_volumes_in_use, new_total_volumes_in_use)
+            self.assertEqual(total_gigabytes_in_use,
+                             new_total_gigabytes_in_use)
+
         # check properties
         if driver or diff_equal:
             self.assertEqual(volume['volume_type_id'], vol_type['id'])
@@ -2990,6 +3015,9 @@ class VolumeTestCase(BaseVolumeTestCase):
 
     def test_retype_volume_migration_equal_types(self):
         self._retype_volume_exec(False, diff_equal=True)
+
+    def test_retype_volume_with_type_only(self):
+        self._retype_volume_exec(True, reserve_vol_type_only=True)
 
     def test_migrate_driver_not_initialized(self):
         volume = tests_utils.create_volume(self.context, size=0,
