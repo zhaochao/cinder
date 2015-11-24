@@ -74,10 +74,20 @@ class HP3PARISCSIDriver(cinder.volume.driver.ISCSIDriver):
         2.0.5 - Added CHAP support, requires 3.1.3 MU1 firmware
                 and hp3parclient 3.1.0.
         2.0.6 - Fixing missing login/logout around attach/detach bug #1367429
+        2.0.7 - Add support for pools with model update
+        2.0.8 - Migrate without losing type settings bug #1356608
+        2.0.9 - Removing locks bug #1381190
+        2.0.10 - Add call to queryHost instead SSH based findHost #1398206
+        2.0.11 - Added missing host name during attach fix #1398206
+        2.0.12 - Removed usage of host name cache #1398914
+        2.0.13 - Update LOG usage to fix translations.  bug #1384312
+        2.0.14 - Do not allow a different iSCSI IP (hp3par_iscsi_ips) to be
+                 used during live-migration.  bug #1423958
+        2.0.15 - Added support for updated detach_volume attachment.
 
     """
 
-    VERSION = "2.0.6"
+    VERSION = "2.0.15"
 
     def __init__(self, *args, **kwargs):
         super(HP3PARISCSIDriver, self).__init__(*args, **kwargs)
@@ -651,10 +661,10 @@ class HP3PARISCSIDriver(cinder.volume.driver.ISCSIDriver):
             self.common.client_logout()
 
     @utils.synchronized('3par', external=True)
-    def detach_volume(self, context, volume):
+    def detach_volume(self, context, volume, attachment=None):
         self.common.client_login()
         try:
-            self.common.detach_volume(volume)
+            self.common.detach_volume(volume, attachment)
         finally:
             self.common.client_logout()
 

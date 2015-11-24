@@ -1058,20 +1058,25 @@ class HP3PARBaseDriver(object):
         # setup_mock_client drive with default configuration
         # and return the mock HTTP 3PAR client
         mock_client = self.setup_driver()
-        self.driver.detach_volume(context.get_admin_context(), self.volume)
-        expected = [
-            mock.call.removeVolumeMetaData(
-                self.VOLUME_3PAR_NAME,
-                'HPQ-CS-instance_uuid')]
+        with mock.patch.object(hpcommon.HP3PARCommon,
+                               '_create_client') as mock_create_client:
+            mock_create_client.return_value = mock_client
+            self.driver.detach_volume(context.get_admin_context(), self.volume,
+                                      None)
+            expected = [
+                mock.call.removeVolumeMetaData(
+                    self.VOLUME_3PAR_NAME,
+                    'HPQ-CS-instance_uuid')]
 
-        mock_client.assert_has_calls(expected)
+            mock_client.assert_has_calls(expected)
 
-        # test the exception
-        mock_client.removeVolumeMetaData.side_effect = Exception('Custom ex')
-        self.assertRaises(exception.CinderException,
-                          self.driver.detach_volume,
-                          context.get_admin_context(),
-                          self.volume)
+            # test the exception
+            mock_client.removeVolumeMetaData.side_effect = Exception(
+                'Custom ex')
+            self.assertRaises(exception.CinderException,
+                              self.driver.detach_volume,
+                              context.get_admin_context(),
+                              self.volume, None)
 
     def test_create_snapshot(self):
         # setup_mock_client drive with default configuration

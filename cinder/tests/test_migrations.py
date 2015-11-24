@@ -1299,7 +1299,7 @@ class TestMigrations(test.TestCase):
 
             self.assertEqual(4, num_defaults)
 
-    def test_migration_032(self):
+    def test_migration_027(self):
         """Test adding volume_type_projects table works correctly."""
         for (key, engine) in self.engines.items():
             migration_api.version_control(engine,
@@ -1348,3 +1348,39 @@ class TestMigrations(test.TestCase):
                                             metadata,
                                             autoload=True)
             self.assertNotIn('is_public', volume_types.c)
+
+    def _check_28(self, engine, data):
+        volumes = db_utils.get_table(engine, 'volumes')
+        self.assertNotIn('instance_uuid', volumes.c)
+        self.assertNotIn('attached_host', volumes.c)
+        self.assertNotIn('attach_time', volumes.c)
+        self.assertNotIn('mountpoint', volumes.c)
+        self.assertIsInstance(volumes.c.multiattach.type,
+                              self.BOOL_TYPE)
+
+        attachments = db_utils.get_table(engine, 'volume_attachment')
+        self.assertIsInstance(attachments.c.attach_mode.type,
+                              sqlalchemy.types.VARCHAR)
+        self.assertIsInstance(attachments.c.instance_uuid.type,
+                              sqlalchemy.types.VARCHAR)
+        self.assertIsInstance(attachments.c.attached_host.type,
+                              sqlalchemy.types.VARCHAR)
+        self.assertIsInstance(attachments.c.mountpoint.type,
+                              sqlalchemy.types.VARCHAR)
+        self.assertIsInstance(attachments.c.attach_status.type,
+                              sqlalchemy.types.VARCHAR)
+
+    def _post_downgrade_028(self, engine):
+        self.assertFalse(engine.dialect.has_table(engine.connect(),
+                                                  "volume_attachment"))
+        volumes = db_utils.get_table(engine, 'volumes')
+        self.assertNotIn('multiattach', volumes.c)
+        self.assertIsInstance(volumes.c.instance_uuid.type,
+                              sqlalchemy.types.VARCHAR)
+        self.assertIsInstance(volumes.c.attached_host.type,
+                              sqlalchemy.types.VARCHAR)
+        self.assertIsInstance(volumes.c.attach_time.type,
+                              sqlalchemy.types.VARCHAR)
+        self.assertIsInstance(volumes.c.mountpoint.type,
+                              sqlalchemy.types.VARCHAR)
+
