@@ -2909,6 +2909,14 @@ class VolumeTestCase(BaseVolumeTestCase):
                                       project_id=project_id,
                                       **reserve_opts)
 
+        old_reserve_opts = {'volumes': -1, 'gigabytes': -volume['size']}
+        QUOTAS.add_volume_type_opts(self.context,
+                                    old_reserve_opts,
+                                    old_vol_type['id'])
+        old_reservations = QUOTAS.reserve(self.context,
+                                          project_id=project_id,
+                                          **old_reserve_opts)
+
         with mock.patch.object(self.volume.driver, 'retype') as _retype:
             with mock.patch.object(volume_types, 'volume_types_diff') as _diff:
                 with mock.patch.object(self.volume, 'migrate_volume') as _mig:
@@ -2923,13 +2931,15 @@ class VolumeTestCase(BaseVolumeTestCase):
                         self.volume.retype(self.context, volume['id'],
                                            vol_type['id'], host_obj,
                                            migration_policy=policy,
-                                           reservations=reservations)
+                                           reservations=reservations,
+                                           old_reservations=old_reservations)
                     else:
                         self.assertRaises(exc, self.volume.retype,
                                           self.context, volume['id'],
                                           vol_type['id'], host_obj,
                                           migration_policy=policy,
-                                          reservations=reservations)
+                                          reservations=reservations,
+                                          old_reservations=old_reservations)
 
         # get volume/quota properties
         volume = db.volume_get(elevated, volume['id'])
