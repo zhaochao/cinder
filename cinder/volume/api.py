@@ -1237,13 +1237,28 @@ class API(base.Base):
         reservations = quota_utils.get_volume_type_reservation(context, volume,
                                                                vol_type_id)
 
+        # Get old reservations
+        try:
+            reserve_opts = {'volumes': -1, 'gigabytes': -volume['size']}
+            QUOTAS.add_volume_type_opts(context,
+                                        reserve_opts,
+                                        old_vol_type_id)
+            old_reservations = QUOTAS.reserve(context,
+                                              project_id=volume['project_id'],
+                                              **reserve_opts)
+        except Exception:
+            LOG.exception(_("Failed to update quota usage while retyping"
+                            " volume."))
+            raise exception.CinderException(msg)
+
         self.update(context, volume, {'status': 'retyping'})
 
         request_spec = {'volume_properties': volume,
                         'volume_id': volume['id'],
                         'volume_type': vol_type,
                         'migration_policy': migration_policy,
-                        'quota_reservations': reservations}
+                        'quota_reservations': reservations,
+                        'old_reservations': old_reservations}
 
         self.scheduler_rpcapi.retype(context, CONF.volume_topic, volume['id'],
                                      request_spec=request_spec,
