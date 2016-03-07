@@ -370,11 +370,12 @@ class RBDDriver(driver.VolumeDriver):
                     pool_stats = [pool for pool in outbuf['pools'] if
                                   pool['name'] ==
                                   self.configuration.rbd_pool][0]['stats']
-                    stats['free_capacity_gb'] = (
-                        pool_stats['max_avail'] / units.Gi)
-                    used_capacity_gb = pool_stats['bytes_used'] / units.Gi
-                    stats['total_capacity_gb'] = (stats['free_capacity_gb']
-                                                  + used_capacity_gb)
+                    stats['free_capacity_gb'] = round((float(
+                        pool_stats['max_avail']) / units.Gi), 2)
+                    used_capacity_gb = float(
+                        pool_stats['bytes_used']) / units.Gi
+                    stats['total_capacity_gb'] = round(
+                        (stats['free_capacity_gb'] + used_capacity_gb), 2)
         except self.rados.Error:
             # just log and return unknown capacities
             LOG.exception(_('error refreshing volume stats'))
