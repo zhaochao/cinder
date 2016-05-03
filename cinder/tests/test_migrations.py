@@ -1305,11 +1305,11 @@ class TestMigrations(test.TestCase):
             migration_api.version_control(engine,
                                           TestMigrations.REPOSITORY,
                                           migration.db_initial_version())
-            migration_api.upgrade(engine, TestMigrations.REPOSITORY, 31)
+            migration_api.upgrade(engine, TestMigrations.REPOSITORY, 26)
             metadata = sqlalchemy.schema.MetaData()
             metadata.bind = engine
 
-            migration_api.upgrade(engine, TestMigrations.REPOSITORY, 32)
+            migration_api.upgrade(engine, TestMigrations.REPOSITORY, 27)
 
             self.assertTrue(engine.dialect.has_table(engine.connect(),
                                                      "volume_type_projects"))
@@ -1338,7 +1338,7 @@ class TestMigrations(test.TestCase):
             self.assertIsInstance(volume_types.c.is_public.type,
                                   self.bool_type[engine.name])
 
-            migration_api.downgrade(engine, TestMigrations.REPOSITORY, 31)
+            migration_api.downgrade(engine, TestMigrations.REPOSITORY, 26)
             metadata = sqlalchemy.schema.MetaData()
             metadata.bind = engine
 
