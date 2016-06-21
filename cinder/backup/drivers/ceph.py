@@ -283,7 +283,7 @@ class CephBackupDriver(BackupDriver):
             if self._file_is_rbd(volume):
                 volume.rbd_image.discard(offset, length)
             else:
-                zeroes = '\0' * length
+                zeroes = '\0' * self.chunk_size
                 chunks = int(length / self.chunk_size)
                 for chunk in xrange(0, chunks):
                     LOG.debug("Writing zeroes chunk %d" % chunk)
