@@ -249,6 +249,25 @@ class API(base.Base):
             return flow_engine.storage.fetch('volume')
 
     @wrap_check_policy
+    def revert_to_snapshot(self, context, volume, snapshot):
+        """revert a volume to a snapshot"""
+
+        if snapshot['status'] not in ['available']:
+            msg = _('Snapshot status must be available')
+            raise exception.InvalidSnapshot(reason=msg)
+
+        if volume['status'] not in ['available']:
+            msg = _('Volume status must be available')
+            raise exception.InvalidVolume(reason=msg)
+
+        # Setting the status.
+        self.db.snapshot_update(context, snapshot['id'],
+                                {'status': 'restoring'})
+        self.db.volume_update(context, volume['id'],
+                              {'status': 'reverting'})
+        self.volume_rpcapi.revert_to_snapshot(context, volume, snapshot)
+
+    @wrap_check_policy
     def delete(self, context, volume, force=False, unmanage_only=False):
         if context.is_admin and context.project_id != volume['project_id']:
             project_id = volume['project_id']
