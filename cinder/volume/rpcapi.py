@@ -115,6 +115,12 @@ class VolumeAPI(object):
                    source_volid=source_volid,
                    consistencygroup_id=consistencygroup_id)
 
+    def revert_to_snapshot(self, ctxt, volume, snapshot):
+        new_host = utils.extract_host(volume['host'])
+        cctxt = self.client.prepare(server=new_host)
+        cctxt.cast(ctxt, 'revert_to_snapshot', volume=volume,
+                   snapshot=snapshot)
+
     def delete_volume(self, ctxt, volume, unmanage_only=False):
         new_host = utils.extract_host(volume['host'])
         cctxt = self.client.prepare(server=new_host, version='1.15')
