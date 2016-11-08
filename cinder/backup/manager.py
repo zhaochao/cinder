@@ -365,7 +365,9 @@ class BackupManager(manager.SchedulerDependentManager):
                 'expected_status': expected_status,
                 'actual_status': actual_status,
             }
-            self.db.volume_update(context, volume_id, {'status': 'available'})
+            self.db.volume_update(context, volume_id,
+                                  {'status': previous_status,
+                                   'previous_status': 'error_backing-up'})
             self.db.backup_update(context, backup_id, {'status': 'error',
                                                        'fail_reason': err})
             raise exception.InvalidBackup(reason=err)

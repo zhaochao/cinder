@@ -438,12 +438,25 @@ class BackupTestCase(BaseBackupTest):
     def test_create_backup_with_bad_backup_status(self):
         """Test creating a backup with a backup with a bad status."""
         vol_id = self._create_volume_db_entry(size=1)
+        vol2_id = self._create_volume_db_entry(previous_status='in-use',
+                                               size=1)
         backup_id = self._create_backup_db_entry(status='available',
                                                  volume_id=vol_id)
+        backup2_id = self._create_backup_db_entry(status='available',
+                                                  volume_id=vol2_id)
         self.assertRaises(exception.InvalidBackup,
                           self.backup_mgr.create_backup,
                           self.ctxt,
                           backup_id)
+        vol = db.volume_get(self.ctxt, vol_id)
+        self.assertEqual('available', vol['status'])
+
+        self.assertRaises(exception.InvalidBackup,
+                          self.backup_mgr.create_backup,
+                          self.ctxt,
+                          backup2_id)
+        vol2 = db.volume_get(self.ctxt, vol2_id)
+        self.assertEqual('in-use', vol2['status'])
 
     @mock.patch('%s.%s' % (CONF.volume_driver, 'backup_volume'))
     def test_create_backup_with_error(self, _mock_volume_backup):
