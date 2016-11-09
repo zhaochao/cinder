@@ -392,6 +392,10 @@ class BackupManager(manager.SchedulerDependentManager):
                                        'fail_reason': unicode(err)})
 
         # Restore the original status.
+        # Because backing-up a volume may takes a long time,
+        # we should check volume status again
+        volume = self.db.volume_get(context, volume_id)
+        previous_status = volume.get('previous_status', None)
         self.db.volume_update(context, volume_id,
                               {'status': previous_status,
                                'previous_status': 'backing-up'})
