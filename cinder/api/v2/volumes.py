@@ -224,6 +224,9 @@ class VolumeController(wsgi.Controller):
                                             self._get_volume_filter_options())
 
         # NOTE(thingee): v2 API allows name instead of display_name
+        if 'name' == sort_key:
+            sort_key = 'display_name'
+
         if 'name' in filters:
             filters['display_name'] = filters['name']
             del filters['name']

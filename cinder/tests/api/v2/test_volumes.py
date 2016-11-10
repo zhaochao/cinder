@@ -20,6 +20,7 @@ from lxml import etree
 from oslo.config import cfg
 import six.moves.urllib.parse as urlparse
 import webob
+import mock
 
 from cinder.api import extensions
 from cinder.api.v2 import volumes
@@ -1387,6 +1388,21 @@ class VolumeApiTest(test.TestCase):
                          {'key': 'value',
                           'attached_mode': 'visible',
                           'readonly': 'visible'})
+
+    @mock.patch('cinder.volume.api.API.get_all')
+    def test_get_volumes_sort_by_name(self, get_all):
+        """Name in client means display_name in database."""
+
+        req = mock.MagicMock()
+        ctxt = context.RequestContext('fake', 'fake', auth_token=True)
+        req.environ = {'cinder.context': ctxt}
+        req.params = {'sort_key': 'name'}
+        self.controller._view_builder.detail_list = mock.Mock()
+        self.controller._get_volumes(req, True)
+        get_all.assert_called_once_with(
+            ctxt, None, None,
+            'display_name', 'desc',
+            {}, viewable_admin_meta=True)
 
 
 class VolumeSerializerTest(test.TestCase):
