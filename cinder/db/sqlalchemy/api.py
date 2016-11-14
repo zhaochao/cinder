@@ -1186,7 +1186,13 @@ def volume_detached(context, volume_id):
     with session.begin():
         volume_ref = _volume_get(context, volume_id, session=session)
         # Hide status update from user if we're performing a volume migration
-        if not volume_ref['migration_status']:
+        # Also hide status update when a non-disruptive backuping is on
+        # the way, and set previous_status to available
+        if volume_ref['migration_status']:
+            pass
+        elif volume_ref['status'] == 'backing-up':
+            volume_ref['previous_status'] = 'available'
+        else:
             volume_ref['status'] = 'available'
         volume_ref['mountpoint'] = None
         volume_ref['attach_status'] = 'detached'
