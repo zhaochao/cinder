@@ -1167,10 +1167,15 @@ class VolumeTestCase(BaseVolumeTestCase):
                                        volume_type=db_vol_type)
 
         volume_src['host'] = 'fake_host'
-        snapshot_ref = volume_api.create_snapshot_force(self.context,
-                                                        volume_src,
-                                                        'name',
-                                                        'description')
+        # no need to call create_snapshot_force,
+        # set volume['status'] to 'available' to meet only
+        # allowing 'available' and 'in-use' volumes which
+        # snapshots can be created on.
+        volume_src['status'] = 'available'
+        snapshot_ref = volume_api.create_snapshot(self.context,
+                                                  volume_src,
+                                                  'name',
+                                                  'description')
         snapshot_ref['status'] = 'available'  # status must be available
         volume_dst = volume_api.create(self.context,
                                        1,
@@ -1995,6 +2000,16 @@ class VolumeTestCase(BaseVolumeTestCase):
                                                         'fake_name',
                                                         'fake_description')
         db.snapshot_destroy(self.context, snapshot_ref['id'])
+        db.volume_destroy(self.context, volume['id'])
+
+        # create snapshot of a deleting volume
+        volume = tests_utils.create_volume(self.context, **self.volume_params)
+        self.volume.create_volume(self.context, volume['id'])
+        db.volume_update(self.context, volume['id'], {'status': 'deleting'})
+        self.assertRaises(exception.InvalidVolume,
+                          volume_api.create_snapshot_force,
+                          self.context, volume,
+                          'fake_name', 'fake_description')
         db.volume_destroy(self.context, volume['id'])
 
     def test_create_snapshot_from_bootable_volume(self):
