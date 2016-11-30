@@ -552,8 +552,14 @@ class API(base.Base):
             msg = _("Snapshot of secondary replica is not allowed.")
             raise exception.InvalidVolume(reason=msg)
 
-        if ((not force) and (volume['status'] != "available")):
-            msg = _("must be available")
+        if volume['status'] not in ['available', 'in-use']:
+            msg = (_('Volume must be available or in-use, '
+                     'but the current status is "%s".')
+                   % volume['status'])
+            raise exception.InvalidVolume(reason=msg)
+        elif ((not force) and (volume['status'] == "in-use")):
+            msg = _('Creating a snapshot on in-use volume '
+                    'must use the force flag.')
             raise exception.InvalidVolume(reason=msg)
 
         try:
