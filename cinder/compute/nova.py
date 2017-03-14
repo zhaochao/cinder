@@ -155,6 +155,12 @@ class API(base.Base):
                                                          attachment_id,
                                                          new_volume_id)
 
+    def update_volume_qos(self, context, server_id, volume_id, qos_specs):
+        nova = novaclient(context, privileged_user=True)
+        nova.volumes.update_volume_qos(server_id,
+                                       volume_id,
+                                       qos_specs)
+
     def create_volume_snapshot(self, context, volume_id, create_info):
         nova = novaclient(context, admin_endpoint=True)
 
