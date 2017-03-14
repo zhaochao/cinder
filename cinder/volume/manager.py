@@ -150,6 +150,19 @@ def locked_snapshot_operation(f):
     return lso_inner1
 
 
+def get_qos_specs_for_connection_info(vol_type_id):
+    specs = None
+    if vol_type_id:
+        res = volume_types.get_volume_type_qos_specs(vol_type_id)
+        qos = res['qos_specs']
+        # only pass qos_specs that is designated to be consumed by
+        # front-end, or both front-end and back-end.
+        if qos and qos.get('consumer') in ['front-end', 'both']:
+            specs = qos.get('specs')
+
+    return dict(qos_specs=specs)
+
+
 class VolumeManager(manager.SchedulerDependentManager):
     """Manages attachable block storage devices."""
 
@@ -903,16 +916,7 @@ class VolumeManager(manager.SchedulerDependentManager):
 
         # Add qos_specs to connection info
         typeid = volume['volume_type_id']
-        specs = None
-        if typeid:
-            res = volume_types.get_volume_type_qos_specs(typeid)
-            qos = res['qos_specs']
-            # only pass qos_specs that is designated to be consumed by
-            # front-end, or both front-end and back-end.
-            if qos and qos.get('consumer') in ['front-end', 'both']:
-                specs = qos.get('specs')
-
-        qos_spec = dict(qos_specs=specs)
+        qos_spec = get_qos_specs_for_connection_info(typeid)
         conn_info['data'].update(qos_spec)
 
         # Add access_mode to connection info
@@ -1398,6 +1402,48 @@ class VolumeManager(manager.SchedulerDependentManager):
             context, volume_ref.get('volume_type_id'), new_type_id)
         if all_equal:
             retyped = True
+
+        if not retyped:
+            # If QoSSpecs of volume types only changed in the front-end, call
+            # Nova API to handle QoSSpecs update. As changs between front-end
+            # and back-end is filterd in VolumeAPI, we here only need to check
+            # whether QoS Specs changed or not.
+            def check_changed(diff_sets):
+                if diff_sets:
+                    for v in diff_sets.values():
+                        if len(set(v)) == 2:
+                            return True
+
+                return False
+
+            only_qos_changed = True
+            for specs, diff_sets in diff.iteritems():
+                if specs != 'qos_specs':
+                    only_qos_changed &= not check_changed(diff_sets)
+                else:
+                    only_qos_changed &= check_changed(diff_sets)
+
+            if only_qos_changed:
+                instance_qos_updated = True
+                if (volume_ref['instance_uuid'] or
+                        volume_ref['attached_host']):
+                    try:
+                        qos_specs = get_qos_specs_for_connection_info(
+                            new_type_id)
+                        nova_api = compute.API()
+                        nova_api.update_volume_qos(context,
+                                                   volume_ref['instance_uuid'],
+                                                   volume_id, qos_specs)
+                    except Exception as ex:
+                        instance_qos_updated = False
+                        if only_qos_changed:
+                            with excutils.save_and_reraise_exception():
+                                _retype_error(context, volume_id,
+                                              old_reservations,
+                                              new_reservations, status_update)
+
+                if instance_qos_updated:
+                    retyped = True
 
         # Call driver to try and change the type
         retype_model_update = None
