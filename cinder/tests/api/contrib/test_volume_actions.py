@@ -52,7 +52,8 @@ class VolumeActionsTest(test.TestCase):
             self.api_patchers[_meth].return_value = True
 
         vol = {'id': 'fake', 'host': 'fake', 'status': 'available', 'size': 1,
-               'migration_status': None, 'volume_type_id': 'fake'}
+               'migration_status': None, 'volume_type_id': 'fake',
+               'project_id': 'project_id'}
         self.get_patcher = mock.patch('cinder.volume.API.get')
         self.mock_volume_get = self.get_patcher.start()
         self.addCleanup(self.get_patcher.stop)
@@ -357,7 +358,8 @@ class VolumeRetypeActionsTest(VolumeActionsTest):
         # Test that the retype API works for both available and in-use
         self._retype_volume_exec(202)
         self.mock_volume_get.return_value['status'] = 'in-use'
-        specs = {'qos_specs': {'id': 'fakeqid1', 'consumer': 'back-end'}}
+        specs = {'id': 'fakeqid1', 'name': 'fake_name1',
+                 'consumer': 'back-end', 'specs': {'key1': 'value1'}}
         _mock_get_qspecs.return_value = specs
         self._retype_volume_exec(202)
 
@@ -408,9 +410,11 @@ class VolumeRetypeActionsTest(VolumeActionsTest):
     def _retype_volume_diff_qos(self, vol_status, consumer, expected_status,
                                 _mock_get_qspecs):
         def fake_get_qos(ctxt, qos_id):
-            d1 = {'qos_specs': {'id': 'fakeqid1', 'consumer': consumer}}
-            d2 = {'qos_specs': {'id': 'fakeqid2', 'consumer': consumer}}
-            return d1 if d1['qos_specs']['id'] == qos_id else d2
+            d1 = {'id': 'fakeqid1', 'name': 'fake_name1',
+                  'consumer': consumer, 'specs': {'key1': 'value1'}}
+            d2 = {'id': 'fakeqid2', 'name': 'fake_name2',
+                  'consumer': consumer, 'specs': {'key1': 'value1'}}
+            return d1 if d1['id'] == qos_id else d2
 
         self.mock_volume_get.return_value['status'] = vol_status
         _mock_get_qspecs.side_effect = fake_get_qos
@@ -835,7 +839,7 @@ class VolumeImageActionsTest(test.TestCase):
                     mock_copy_volume_to_image.side_effect = \
                         self.fake_rpc_copy_volume_to_image
 
-                    CONF.set_override('glance_core_properties', [])
+                    self.override_config('glance_core_properties', [])
 
                     req = fakes.HTTPRequest.blank(
                         '/v2/tenant1/volumes/%s/action' % id)
