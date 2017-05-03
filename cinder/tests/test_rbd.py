@@ -621,10 +621,14 @@ class RBDTestCase(test.TestCase):
         client.__enter__.return_value = client
 
         client.cluster = mock.Mock()
-        client.cluster.get_cluster_stats = mock.Mock()
-        client.cluster.get_cluster_stats.return_value = {'kb': 1024 ** 3,
-                                                         'kb_avail': 1024 ** 2}
-
+        client.cluster.mon_command = mock.Mock()
+        client.cluster.mon_command.return_value = (
+            0, '{"stats":{"total_bytes":64385286144,'
+            '"total_used_bytes":3289628672,"total_avail_bytes":61095657472},'
+            '"pools":[{"name":"rbd","id":2,"stats":{"kb_used":1510197,'
+            '"bytes_used":1546440971,"max_avail":28987613184,"objects":412}},'
+            '{"name":"volumes","id":3,"stats":{"kb_used":0,"bytes_used":0,'
+            '"max_avail":28987613184,"objects":0}}]}\n', '')
         self.driver.configuration.safe_get = mock.Mock()
         self.driver.configuration.safe_get.return_value = 'RBD'
 
@@ -633,12 +637,13 @@ class RBDTestCase(test.TestCase):
             vendor_name='Open Source',
             driver_version=self.driver.VERSION,
             storage_protocol='ceph',
-            total_capacity_gb=1024,
-            free_capacity_gb=1,
+            total_capacity_gb=28.44,
+            free_capacity_gb=27.0,
             reserved_percentage=0)
 
         actual = self.driver.get_volume_stats(True)
-        client.cluster.get_cluster_stats.assert_called_once()
+        client.cluster.mon_command.assert_called_once_with(
+            '{"prefix":"df", "format":"json"}', '')
         self.assertDictMatch(expected, actual)
 
     @common_mocks
@@ -647,8 +652,8 @@ class RBDTestCase(test.TestCase):
         client.__enter__.return_value = client
 
         client.cluster = mock.Mock()
-        client.cluster.get_cluster_stats = mock.Mock()
-        client.cluster.get_cluster_stats.side_effect = Exception
+        client.cluster.mon_command = mock.Mock()
+        client.cluster.mon_command.return_value = (22, '', '')
 
         self.driver.configuration.safe_get = mock.Mock()
         self.driver.configuration.safe_get.return_value = 'RBD'
@@ -662,7 +667,8 @@ class RBDTestCase(test.TestCase):
                         reserved_percentage=0)
 
         actual = self.driver.get_volume_stats(True)
-        client.cluster.get_cluster_stats.assert_called_once()
+        client.cluster.mon_command.assert_called_once_with(
+            '{"prefix":"df", "format":"json"}', '')
         self.assertDictMatch(expected, actual)
 
     @common_mocks
