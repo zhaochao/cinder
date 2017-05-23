@@ -1197,18 +1197,20 @@ class API(base.Base):
             msg = _('Retype cannot change encryption requirements')
             raise exception.InvalidInput(reason=msg)
 
-        # We don't support changing QoS at the front-end yet for in-use volumes
-        # TODO(avishay): Call Nova to change QoS setting (libvirt has support
-        # - virDomainSetBlockIoTune() - Nova does not have support yet).
+        # for in-use volumes, still don't support changes between backend and
+        # front-end
+        qos_consumers = set()
         if (volume['status'] != 'available' and
                 old_vol_type_qos_id != vol_type_qos_id):
             for qos_id in [old_vol_type_qos_id, vol_type_qos_id]:
                 if qos_id:
                     specs = qos_specs.get_qos_specs(context.elevated(), qos_id)
-                    if specs['qos_specs']['consumer'] != 'back-end':
-                        msg = _('Retype cannot change front-end qos specs for '
-                                'in-use volumes')
-                        raise exception.InvalidInput(reason=msg)
+                    qos_consumers.add(specs['consumer'])
+
+            if qos_consumers != set(['front-end']):
+                msg = _('Retype cannot change QoS Specs between front-end and'
+                        'back-end')
+                raise exception.InvalidInput(reason=msg)
 
         # We're checking here in so that we can report any quota issues as
         # early as possible, but won't commit until we change the type. We
