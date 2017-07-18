@@ -869,3 +869,7 @@ class HBSDNotFound(NotFound):
 # Datera driver
 class DateraAPIException(VolumeBackendAPIException):
     message = _("Bad response from Datera API")
+
+
+class GlanceOperationFailed(CinderException):
+    message = _("An error has occurred during glance operation: %(reason)s")

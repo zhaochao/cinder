@@ -50,6 +50,8 @@ from cinder import rpc
 from cinder import utils
 from cinder.volume import utils as volume_utils
 
+from cinder.image import glance
+
 LOG = logging.getLogger(__name__)
 
 backup_manager_opts = [
@@ -404,6 +406,90 @@ class BackupManager(manager.SchedulerDependentManager):
                                                    'availability_zone':
                                                    self.az})
         LOG.info(_('Create backup finished. backup: %s.'), backup_id)
+
+    def _delete_image(self, context, image_id, image_service):
+        """Deletes an image stuck in queued or saving state."""
+        try:
+            image_meta = image_service.show(context, image_id)
+            image_status = image_meta.get('status')
+            if image_status == 'queued' or image_status == 'saving':
+                LOG.warn("Deleting image %(image_id)s in %(image_status)s "
+                         "state.",
+                         {'image_id': image_id,
+                          'image_status': image_status})
+            image_service.delete(context, image_id)
+        except Exception:
+            LOG.warn(_("Error occurred while deleting image %s."),
+                     image_id, exc_info=True)
+
+    def upload_backup_to_image(self, context, backup, image_meta):
+        """Uploads the specified backup to Glance.
+
+        image_meta is a dictionary containing the following keys:
+        'id', 'container_format', 'disk_format'
+
+        """
+        LOG.info(_('Upload backup started, backup: %(backup_id)s '
+                   'image_id: %(image_id)s.'),
+                 {'backup_id': backup['id'], 'image_id': image_meta['id']})
+        self.db.backup_update(context, backup['id'], {'host': self.host})
+
+        payload = {'backup_id': backup['id'], 'image_id': image_meta['id']}
+
+        expected_status = 'uploading'
+        actual_status = backup['status']
+        if actual_status != expected_status:
+            err = (_('Upload backup aborted: expected backup status '
+                     '%(expected_status)s but got %(actual_status)s.') %
+                   {'expected_status': expected_status,
+                    'actual_status': actual_status})
+            self.db.backup_update(context, backup['id'], {'status': 'error',
+                                  'fail_reason': err})
+            raise exception.InvalidBackup(reason=err)
+
+        backup_service = self._map_service_to_driver(backup['service'])
+        configured_service = self.driver_name
+        if backup_service != configured_service:
+            err = _('Upload backup aborted, the backup service currently'
+                    ' configured [%(configured_service)s] is not the'
+                    ' backup service that was used to create this'
+                    ' backup [%(backup_service)s].') % {
+                'configured_service': configured_service,
+                'backup_service': backup_service,
+            }
+            self.db.backup_update(context, backup['id'],
+                                  {'status': 'available'})
+            raise exception.InvalidBackup(reason=err)
+
+        try:
+
+            utils.require_driver_initialized(self.driver)
+            image_service, image_id = \
+                glance.get_remote_image_service(context, image_meta['id'])
+
+            backup_service = self.service.get_backup_driver(context)
+
+            backup_service.upload_backup_to_image(backup,
+                                                  image_service,
+                                                  image_meta)
+        except Exception as error:
+            LOG.error(_("Error occurred while uploading backup %(backup_id)s "
+                        "to image %(image_id)s."),
+                      {'backup_id': backup['id'],
+                       'image_id': image_meta['id']})
+            if image_service is not None:
+                # Deletes the image if it is in queued or saving state
+                self._delete_image(context, image_meta['id'], image_service)
+
+            with excutils.save_and_reraise_exception():
+                payload['message'] = unicode(error)
+        finally:
+            self.db.backup_update(context, backup['id'],
+                                  {'status': 'available'})
+
+        LOG.info(_('Upload backup finished, backup %(backup_id)s uploaded'
+                   ' to glance %(image_id)s.') %
+                 {'backup_id': backup['id'], 'image_id': image_meta['id']})
 
     def restore_backup(self, context, backup_id, volume_id):
         """Restore volume backups from configured backup service."""
