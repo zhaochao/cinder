@@ -592,6 +592,23 @@ class VolumeManager(manager.SchedulerDependentManager):
                                     {'status': 'error_restoring'})
             raise exception.InvalidSnapshot(reason=err)
 
+        # if the backend driver do not support reverting to any snapshot,
+        # sure the snapshot is the latest one
+        if not (hasattr(self.driver, 'support_reverting_to_any_snapshot') and
+                self.driver.support_reverting_to_any_snapshot is True):
+            l_snap = self.db.snapshot_get_latest_for_volume(context,
+                                                                 volume['id'])
+            if l_snap.id != snapshot['id']:
+                err = (_('Revert volume aborted, the backend only '
+                         'support reverting from the latest snapshot, '
+                         'but got %(snap_id)s.') %
+                       {'snap_id': snapshot['id']})
+                self.db.snapshot_update(context, snapshot['id'],
+                                        {'status': 'available'})
+                self.db.volume_update(context, volume['id'],
+                                      {'status': 'error_reverting'})
+                raise exception.InvalidSnapshot(reason=err)
+
         LOG.info("Start to perform revert to snapshot process.")
 
         # Create a snapshot which can be used to restore the volume

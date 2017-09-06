@@ -27,7 +27,6 @@ from cinder import utils
 from cinder import volume
 
 import six
-from cinder import db
 
 LOG = logging.getLogger(__name__)
 
@@ -395,12 +394,10 @@ class VolumeActionsController(wsgi.Controller):
             msg = _("Snapshot could not be found")
             raise webob.exc.HTTPNotFound(explanation=msg)
 
-        # Ensure snapshot is the volume's latest snapshot.
-        l_snap = db.snapshot_get_latest_for_volume(context,
-                                                        volume['id'])
-        if l_snap.id != snapshot_id:
-            msg = _("Specified snapshot %(s_id)s is not "
-                    "the latest one of volume %(v_id)s.")
+        # Ensure volume and snapshot match.
+        if snapshot['volume_id'] != id:
+            msg = _("Snapshot %(s_id)s was not created from "
+                    "the volume %(v_id)s.")
             raise webob.exc.HTTPBadRequest(
                 explanation=msg % {'s_id': snapshot_id, 'v_id': id})
 
