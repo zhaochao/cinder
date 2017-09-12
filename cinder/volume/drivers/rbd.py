@@ -698,6 +698,11 @@ class RBDDriver(driver.VolumeDriver):
                           "operation to proceed.", volume_name)
                 raise exception.VolumeNotFound(volume_id=volume_name)
 
+            # resize rbd to snap volume size if the snapshot is created
+            # before the rbd extended
+            if volume['size'] != snapshot['volume_size']:
+                dest_volume.resize(volume['size'])
+
     def create_snapshot(self, snapshot):
         """Creates an rbd snapshot."""
         with RBDVolumeProxy(self, snapshot['volume_name']) as volume:
