@@ -286,6 +286,10 @@ class SnapshotNotFound(NotFound):
     message = _("Snapshot %(snapshot_id)s could not be found.")
 
 
+class VolumeSnapshotNotFound(NotFound):
+    message = _("No snapshots found for volume %(volume_id)s.")
+
+
 class VolumeIsBusy(CinderException):
     message = _("deleting volume %(volume_name)s that has snapshot")
 
