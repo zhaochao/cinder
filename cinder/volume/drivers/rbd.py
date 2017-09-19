@@ -249,7 +249,7 @@ class RBDDriver(driver.VolumeDriver):
     """Implements RADOS block device (RBD) volume commands."""
 
     VERSION = '1.1.0'
-    support_reverting_to_any_snapshot = False
+    support_reverting_to_any_snapshot = True
 
     def __init__(self, *args, **kwargs):
         super(RBDDriver, self).__init__(*args, **kwargs)
