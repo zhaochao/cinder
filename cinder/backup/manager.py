@@ -282,20 +282,20 @@ class BackupManager(manager.SchedulerDependentManager):
         # that are not deleted. Make sure any temporary volumes or snapshots
         # create by the backup job are deleted when service is started.
         try:
-            volume = self.db.volume_get(ctxt, backup.volume_id)
+            volume = self.db.volume_get(ctxt, backup['volume_id'])
             volume_host = volume_utils.extract_host(volume['host'],
                                                     'backend')
             backend = self._get_volume_backend(host=volume_host)
             mgr = self._get_manager(backend)
         except (KeyError, exception.VolumeNotFound):
             LOG.debug("Could not find a volume to clean up for "
-                      "backup %s.", backup.id)
+                      "backup %s.", backup['id'])
             return
 
         if backup['temp_volume_id'] and backup['status'] == 'error':
             try:
                 temp_volume = self.db.volume_get(ctxt,
-                                                 backup.temp_volume_id)
+                                                 backup['temp_volume_id'])
                 # The temp volume should be deleted directly thru the
                 # the volume driver, not thru the volume manager.
                 mgr.driver.delete_volume(temp_volume)
@@ -303,8 +303,8 @@ class BackupManager(manager.SchedulerDependentManager):
             except exception.VolumeNotFound:
                 LOG.debug("Could not find temp volume %(vol)s to clean up "
                           "for backup %(backup)s.",
-                          {'vol': backup.temp_volume_id,
-                           'backup': backup.id})
+                          {'vol': backup['temp_volume_id'],
+                           'backup': backup['id']})
             backup['temp_volume_id'] = None
             self.db.backup_update(ctxt, backup['id'],
                                   {'temp_volume_id': None})
