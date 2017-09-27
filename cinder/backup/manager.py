@@ -202,14 +202,6 @@ class BackupManager(manager.SchedulerDependentManager):
 
     def _cleanup_incomplete_backup_operations(self, ctxt):
         LOG.info(_("Cleaning up incomplete backup operations."))
-        volumes = self.db.volume_get_all_by_host(ctxt, self.host)
-
-        for volume in volumes:
-            try:
-                self._cleanup_one_volume(ctxt, volume)
-            except Exception:
-                LOG.exception(_("Problem cleaning up volume %(vol)s."),
-                              {'vol': volume['id']})
 
         # TODO(smulcahy) implement full resume of backup and restore
         # operations on restart (rather than simply resetting)
@@ -251,18 +243,25 @@ class BackupManager(manager.SchedulerDependentManager):
         if backup['status'] == 'creating':
             LOG.info(_('Resetting backup %s to error (was creating).'),
                      backup['id'])
+
+            volume = self.db.volume_get(ctxt, backup['volume_id'])
+            self._cleanup_one_volume(ctxt, volume)
+
             err = 'incomplete backup reset on manager restart'
             backup['status'] = 'error'
             backup['fail_reason'] = err
             self.db.backup_update(ctxt, backup['id'], {'status': 'error',
                                                        'fail_reason': err})
-        if backup['status'] == 'restoring':
+        elif backup['status'] == 'restoring':
             LOG.info(_('Resetting backup %s to available (was restoring).'),
                      backup['id'])
+            volume = self.db.volume_get(ctxt, backup['restore_volume_id'])
+            self._cleanup_one_volume(ctxt, volume)
+
             backup['status'] = 'available'
             self.db.backup_update(ctxt, backup['id'],
                                   {'status': 'available'})
-        if backup['status'] == 'deleting':
+        elif backup['status'] == 'deleting':
             LOG.info(_('Resuming delete on backup: %s.'), backup['id'])
             self.delete_backup(ctxt, backup['id'])
 
