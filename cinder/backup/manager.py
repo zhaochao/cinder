@@ -198,8 +198,7 @@ class BackupManager(manager.SchedulerDependentManager):
             self._cleanup_incomplete_backup_operations(ctxt)
         except Exception:
             # Don't block startup of the backup service.
-            LOG.exception(_("Problem cleaning incomplete backup "
-                              "operations."))
+            LOG.exception(_("Problem cleaning incomplete backup operations."))
 
     def _cleanup_incomplete_backup_operations(self, ctxt):
         LOG.info(_("Cleaning up incomplete backup operations."))
@@ -225,8 +224,8 @@ class BackupManager(manager.SchedulerDependentManager):
                 self._cleanup_temp_volumes_snapshots_for_one_backup(ctxt,
                                                                     backup)
             except Exception:
-                LOG.exception(_("Problem cleaning temp volumes and "
-                                  "snapshots for backup %(bkup)s."),
+                LOG.exception(_("Problem cleaning temp volumes and snapshots"
+                                " for backup %(bkup)s."),
                               {'bkup': backup['id']})
 
     def _cleanup_one_volume(self, ctxt, volume):
@@ -235,16 +234,16 @@ class BackupManager(manager.SchedulerDependentManager):
         mgr = self._get_manager(backend)
         if volume['status'] == 'backing-up':
             self._detach_volume(ctxt, mgr, volume)
-            LOG.info(_('Resetting volume %(vol_id)s to previous '
-                         'status %(status)s (was backing-up).'),
+            LOG.info(_('Resetting volume %(vol_id)s to previous status'
+                       ' %(status)s (was backing-up).'),
                      {'vol_id': volume['id'],
                       'status': volume['previous_status']})
             self.db.volume_update(ctxt, volume['id'],
                                   {'status': volume['previous_status']})
         elif volume['status'] == 'restoring-backup':
             self._detach_volume(ctxt, mgr, volume)
-            LOG.info(_('setting volume %s to error_restoring '
-                         '(was restoring-backup).'), volume['id'])
+            LOG.info(_('setting volume %s to error_restoring'
+                       ' (was restoring-backup).'), volume['id'])
             self.db.volume_update(ctxt, volume['id'],
                                   {'status': 'error_restoring'})
 
@@ -258,8 +257,7 @@ class BackupManager(manager.SchedulerDependentManager):
             self.db.backup_update(ctxt, backup['id'], {'status': 'error',
                                                        'fail_reason': err})
         if backup['status'] == 'restoring':
-            LOG.info(_('Resetting backup %s to '
-                         'available (was restoring).'),
+            LOG.info(_('Resetting backup %s to available (was restoring).'),
                      backup['id'])
             backup['status'] = 'available'
             self.db.backup_update(ctxt, backup['id'],
@@ -271,7 +269,7 @@ class BackupManager(manager.SchedulerDependentManager):
     def _detach_volume(self, ctxt, mgr, volume):
         if (volume['attach_status'] == 'attached' and
                 volume['attached_host'] == self.host and
-                volume['instance_uuid'] == None):
+                volume['instance_uuid'] is None):
             try:
                 mgr.detach_volume(ctxt, volume['id'])
             except Exception:
@@ -314,12 +312,12 @@ class BackupManager(manager.SchedulerDependentManager):
         if backup['temp_snapshot_id'] and backup['status'] == 'error':
             try:
                 temp_snapshot = self.db.snapshot_get(
-                        ctxt, backup['temp_snapshot_id'])
+                    ctxt, backup['temp_snapshot_id'])
                 # The temp snapshot should be deleted directly thru the
                 # volume driver, not thru the volume manager.
                 mgr.driver.delete_snapshot(temp_snapshot)
                 self.db.volume_glance_metadata_delete_by_snapshot(
-                        ctxt, temp_snapshot['id'])
+                    ctxt, temp_snapshot['id'])
                 self.db.snapshot_destroy(ctxt, temp_snapshot['id'])
             except exception.SnapshotNotFound:
                 LOG.debug("Could not find temp snapshot %(snap)s to clean "
@@ -337,7 +335,7 @@ class BackupManager(manager.SchedulerDependentManager):
         volume = self.db.volume_get(context, volume_id)
         previous_status = volume.get('previous_status', None)
         LOG.info(_('Create backup started, backup: %(backup_id)s '
-                     'volume: %(volume_id)s.'),
+                   'volume: %(volume_id)s.'),
                  {'backup_id': backup['id'], 'volume_id': volume_id})
 
         volume_host = volume_utils.extract_host(volume['host'], 'backend')
