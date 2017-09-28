@@ -432,6 +432,7 @@ class BackupManager(manager.SchedulerDependentManager):
                    'image_id: %(image_id)s.'),
                  {'backup_id': backup['id'], 'image_id': image_meta['id']})
         self.db.backup_update(context, backup['id'], {'host': self.host})
+        self._notify_about_backup_usage(context, backup, "upload.start")
 
         payload = {'backup_id': backup['id'], 'image_id': image_meta['id']}
 
@@ -483,12 +484,13 @@ class BackupManager(manager.SchedulerDependentManager):
             with excutils.save_and_reraise_exception():
                 payload['message'] = unicode(error)
         finally:
-            self.db.backup_update(context, backup['id'],
-                                  {'status': 'available'})
+            backup = self.db.backup_update(context, backup['id'],
+                                           {'status': 'available'})
 
         LOG.info(_('Upload backup finished, backup %(backup_id)s uploaded'
                    ' to glance %(image_id)s.') %
                  {'backup_id': backup['id'], 'image_id': image_meta['id']})
+        self._notify_about_backup_usage(context, backup, "upload.end")
 
     def restore_backup(self, context, backup_id, volume_id):
         """Restore volume backups from configured backup service."""
